@@ -48,3 +48,61 @@ flowchart LR
 
 <img width="1565" height="855" alt="사진진" src="https://github.com/user-attachments/assets/937d8ab2-5157-4723-963a-a667532acaa9" />
 
+## 💻 핵심 비즈니스 로직 (Lambda Code)
+이 시스템의 두뇌 역할을 하는 AWS Lambda의 실제 파이썬(Python) 코드입니다. AI 비전 분석, 알림 전송, S3 객체 이동 및 삭제를 한 번에 처리합니다.
+
+```python
+import boto3
+import urllib.parse
+
+def lambda_handler(event, context):
+    s3 = boto3.client('s3')
+    rekognition = boto3.client('rekognition')
+    sns = boto3.client('sns')
+    
+    dest_bucket = 'gongsumin-clean-zone' 
+    sns_arn = '본인의_SNS_ARN' # 보안을 위해 실제 ARN은 마스킹 처리
+    
+    source_bucket = event['Records'][0]['s3']['bucket']['name']
+    object_key = urllib.parse.unquote_plus(event['Records'][0]['s3']['object']['key'], encoding='utf-8')
+    source_ip = event['Records'][0].get('requestParameters', {}).get('sourceIPAddress', 'Unknown IP')
+
+    try:
+        # AI 유해 콘텐츠 분석 (신뢰도 10% 이상 시 엄격 차단)
+        response = rekognition.detect_moderation_labels(
+            Image={'S3Object': {'Bucket': source_bucket, 'Name': object_key}},
+            MinConfidence=10 
+        )
+        
+        labels = response['ModerationLabels']
+        
+        if labels:
+            risk_level = "🚨 CRITICAL" if labels[0]['Confidence'] >= 80 else "⚠️ HIGH"
+            reasons = ", ".join([f"{l['Name']}({l['Confidence']:.1f}%)" for l in labels])
+            
+            message = f"[탐지 요약]\n위험 등급: {risk_level}\n탐지 사유: {reasons}\nIP 주소: {source_ip}"
+            
+            # 관리자 메일 발송 및 파일 영구 삭제
+            sns.publish(TopicArn=sns_arn, Message=message, Subject="[긴급 보안 알림] 유해 콘텐츠 차단")
+            s3.delete_object(Bucket=source_bucket, Key=object_key)
+            
+        else:
+            # 검역 통과 파일: Clean Zone으로 이동 후 원본 삭제
+            copy_source = {'Bucket': source_bucket, 'Key': object_key}
+            s3.copy_object(CopySource=copy_source, Bucket=dest_bucket, Key=object_key)
+            s3.delete_object(Bucket=source_bucket, Key=object_key)
+            
+        return {"statusCode": 200}
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        raise e
+```
+
+## 🏃‍♂️ 인프라 구축 과정 (How to Build)
+단순히 코드를 짜는 것을 넘어, AWS 클라우드 환경에서 서비스를 직접 연결하고 권한을 제어하며 구축했습니다.
+
+1. **IAM Role(역할) 및 최소 권한 부여**: Lambda 함수가 다른 AWS 서비스를 조작할 수 있도록 `AmazonS3FullAccess`, `AmazonRekognitionFullAccess`, `AmazonSNSFullAccess` 정책을 연결한 전용 실행 역할을 생성했습니다.
+2. **S3 버킷 스토리지 분리**: 악성 파일이 무방비로 올라오는 `upload-zone`과, 검역을 통과한 무해한 파일만 저장되는 `clean-zone`으로 물리적인 저장 공간을 분리하여 보안성을 높였습니다.
+3. **Lambda Event Trigger 설정**: 사용자가 파일을 올리는 즉시 검사가 시작되도록, S3 `upload-zone`의 객체 생성(ObjectCreated) 이벤트를 Lambda의 트리거로 연동했습니다.
+4. **SNS 알림망 구축 및 구독**: 관리자 이메일을 엔드포인트로 하는 SNS Topic을 생성하고, 구독 승인(Confirm) 과정을 거쳐 실시간 경고 파이프라인을 완성했습니다.
