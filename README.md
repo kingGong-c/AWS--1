@@ -43,3 +43,8 @@ flowchart LR
 
 **2. 관리자 가시성 확보 (IP Tracking)**
 단순히 파일을 삭제하는 것을 넘어, 보안 사고 발생 시 사후 추적이 가능하도록 S3 Event 레코드 파라미터에서 `sourceIPAddress`를 추출하는 로직을 Lambda에 추가했습니다. 이를 통해 알림 메일에 공격 의심 IP를 포함시켜 실무 수준의 대응력을 갖추었습니다.
+## 📸 실행 결과 (Demo)
+* **AI 보안 검역 시스템 작동 및 관리자 알림 메일 수신 화면**
+
+<img width="1565" height="855" alt="사진진" src="https://github.com/user-attachments/assets/937d8ab2-5157-4723-963a-a667532acaa9" />
+
