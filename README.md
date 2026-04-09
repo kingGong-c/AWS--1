@@ -102,7 +102,7 @@ def lambda_handler(event, context):
 ## 🏃‍♂️ 인프라 구축 과정 (How to Build)
 단순히 코드를 짜는 것을 넘어, AWS 클라우드 환경에서 서비스를 직접 연결하고 권한을 제어하며 구축했습니다.
 
-1. **IAM Role(역할) 및 최소 권한 부여**: Lambda 함수가 다른 AWS 서비스를 조작할 수 있도록 `AmazonS3FullAccess`, `AmazonRekognitionFullAccess`, `AmazonSNSFullAccess` 정책을 연결한 전용 실행 역할을 생성했습니다.
+1. **IAM Role(역할) 및 최소 권한 부여**: Lambda 함수가 다른 AWS 서비스를 조작할 수 있도록 `AmazonS3FullAccess`, `AmazonRekognitionFullAccess`, `AmazonSNSFullAccess` 정책을 연결한 전용 실행 역할을 생성했습니다. ( 보안성을 챙기기 위해 최소권한을 원칙으로  읽기권한만을 부여하여 보안성을 확대하였다. )
 2. **S3 버킷 스토리지 분리**: 악성 파일이 무방비로 올라오는 `upload-zone`과, 검역을 통과한 무해한 파일만 저장되는 `clean-zone`으로 물리적인 저장 공간을 분리하여 보안성을 높였습니다.
 3. **Lambda Event Trigger 설정**: 사용자가 파일을 올리는 즉시 검사가 시작되도록, S3 `upload-zone`의 객체 생성(ObjectCreated) 이벤트를 Lambda의 트리거로 연동했습니다.
 4. **SNS 알림망 구축 및 구독**: 관리자 이메일을 엔드포인트로 하는 SNS Topic을 생성하고, 구독 승인(Confirm) 과정을 거쳐 실시간 경고 파이프라인을 완성했습니다.
